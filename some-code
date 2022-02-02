@@ -1,0 +1,315 @@
+/* Author - Jack Manlosa*/
+/* Created at - January 19 2022 */
+/*this query only looks on account created on the homepage */
+
+
+#Build query for all related data as tables first
+
+#weve remove returning customers in the mix by checking their userID if its NULL
+With experiment_participants_table as
+(
+SELECT  exp.experimentid AS experiment_id,
+        exp.variationid AS experiment_variation_id,
+        exp.variationname AS experiment_variation_name,
+        exp.anonymous_id as experiment_visitor,
+        exp.id AS experiment_visit_id,
+        MIN(exp.timestamp) as experiment_datetime
+
+FROM `td2-segment-warehouse.td2_node_js.experiment_viewed` as exp
+
+#Query only from designated experiment
+WHERE   exp.experimentid = "GT2-549-v4"
+        AND exp.timestamp >= '2022-01-12'
+        and exp.user_id is NULL
+
+Group by 1,2,3,4,5
+),
+
+homepage_visit_table as (
+ SELECT
+    homepage.anonymous_id as trialer_anonymousID,
+    homepage.name as pageName,
+    homepage.category as Category,
+    MIN(homepage.timestamp) as visit_datetime
+
+    FROM `td2-segment-warehouse.td2_node_js.pages` homepage
+    where homepage.name = 'Home'
+    AND homepage.timestamp >= '2022-01-12'
+
+  group by 1,3,2
+
+),
+
+prescreen_visit_table as (
+ SELECT
+    homepage.anonymous_id as trialer_anonymousID,
+    homepage.name as pageName,
+    homepage.category as Category,
+    MIN(homepage.timestamp) as visit_datetime
+
+    FROM `td2-segment-warehouse.td2_node_js.pages` homepage
+    where homepage.name = 'Pre-Screen'
+    AND homepage.timestamp >= '2022-01-12'
+
+  group by 1,2,3
+
+),
+
+question1_visit_table as (
+ SELECT
+    homepage.anonymous_id as trialer_anonymousID,
+    homepage.name as pageName,
+    homepage.category as Category,
+    MIN(homepage.timestamp) as visit_datetime
+
+    FROM `td2-segment-warehouse.td2_node_js.pages` homepage
+    where homepage.name = 'Question 1'
+    AND homepage.timestamp >= '2022-01-12'
+
+  group by 1,2,3
+
+),
+
+question2_visit_table as (
+ SELECT
+    homepage.anonymous_id as trialer_anonymousID,
+    homepage.name as pageName,
+    homepage.category as Category,
+    MIN(homepage.timestamp) as visit_datetime
+
+    FROM `td2-segment-warehouse.td2_node_js.pages` homepage
+    where homepage.name = 'Question 2'
+    AND homepage.timestamp >= '2022-01-12'
+
+  group by 1,2,3
+
+),
+
+question3_visit_table as (
+ SELECT
+    homepage.anonymous_id as trialer_anonymousID,
+    homepage.name as pageName,
+    homepage.category as Category,
+    MIN(homepage.timestamp) as visit_datetime
+
+    FROM `td2-segment-warehouse.td2_node_js.pages` homepage
+    where homepage.name = 'Question 3'
+    AND homepage.timestamp >= '2022-01-12'
+
+  group by 1,2,3
+
+),
+
+question4_visit_table as (
+ SELECT
+    homepage.anonymous_id as trialer_anonymousID,
+    homepage.name as pageName,
+    homepage.category as Category,
+    MIN(homepage.timestamp) as visit_datetime
+
+    FROM `td2-segment-warehouse.td2_node_js.pages` homepage
+    where homepage.name = 'Question 4'
+    AND homepage.timestamp >= '2022-01-12'
+
+  group by 1,2,3
+
+),
+
+#All accounts created
+account_created_table as (
+SELECT  FORMAT_DATETIME( "%x",account_created.timestamp) as trial_start_date,
+        account_created.user_id as user_id,
+        identifies_table2.tdcompanyid as company_id,
+        account_created.homecta as home_cta,
+        account_created.anonymous_id as trialer_anonym_id
+
+    FROM `td2-segment-warehouse.td2_node_js.account_created` account_created
+
+   Left Join(
+        SELECT  identifies3.user_id,
+                identifies3.tdcompanyid
+        FROM `td2-segment-warehouse.td2_node_js.identifies` identifies3
+
+        GROUP BY 1,2
+        ) identifies_table2
+    ON account_created.user_id = identifies_table2.user_id
+
+    WHERE date(account_created.timestamp) between '2022-01-12' and current_date()
+    AND (account_created.email NOT LIKE '%@timedoctor%'
+    OR account_created.email NOT LIKE 'tdqalive%'
+    OR account_created.email NOT LIKE '%@staff.com%'
+    OR account_created.email NOT LIKE '%@staff.dev%'
+    OR account_created.email NOT LIKE 'qalive%'
+    )
+
+    GROUP BY 1,2,3,4,5
+    order by 1 desc
+),
+
+/*#Accounts created only happening on the home page
+account_created_homepage_only_table as (
+SELECT  FORMAT_DATETIME( "%x",account_created.timestamp) as trial_start_date,
+        account_created.user_id as user_id,
+        identifies_table.tdcompanyid as company_id,
+        account_created.homecta as home_cta,
+        account_created.anonymous_id as trialer_anonym_id
+
+    FROM `td2-segment-warehouse.td2_node_js.account_created` account_created
+
+   Left Join(
+        SELECT  identifies2.user_id,
+                identifies2.tdcompanyid
+        FROM `td2-segment-warehouse.td2_node_js.identifies` identifies2
+
+        GROUP BY 1,2
+        ) identifies_table
+    ON account_created.user_id = identifies_table.user_id
+
+    WHERE date(account_created.timestamp) between '2022-01-12' and current_date()
+    AND (account_created.email NOT LIKE '%@timedoctor%'
+    OR account_created.email NOT LIKE 'tdqalive%'
+    OR account_created.email NOT LIKE '%@staff.com%'
+    OR account_created.email NOT LIKE '%@staff.dev%'
+    OR account_created.email NOT LIKE 'qalive%'
+    )
+    --AND (account_created.homecta like '%start-trial-button-top%' or account_created.homecta like '%main-form' or account_created.homecta like '%footer%'
+      --   or account_created.homecta like '%sticky-button%' or account_created.homecta like '%pricing-section%' or account_created.homecta like '%features-section%')
+    AND (account_created.homecta like '%start-trial-button-top%'
+    OR account_created.homecta like '%main-form'
+    OR account_created.homecta like '%footer%'
+    OR account_created.homecta like '%sticky-button%'
+    OR account_created.homecta like '%pricing-section%'
+    OR account_created.homecta like '%features-section%')
+
+    GROUP BY 1,2,3,4,5
+    order by 1 desc
+),*/
+
+#Get all trialers who completed the onboarding
+onboard_completed_table as (
+SELECT  onboard_complete.timestamp as original_timestamp,
+        onboard_complete.user_id as onboard1_userid,
+        onboard_complete.anonymous_id as trialer
+
+    FROM `td2-segment-warehouse.td2_node_js.onboard_complete` onboard_complete
+    WHERE onboard_complete.timestamp >= '2022-01-12'
+
+
+    GROUP BY 1,2,3 order by 1 desc
+    ),
+
+#Trialers who invited users during the onboarding
+invited_users_during_onboarding_table as (
+SELECT  invited_users_onboarding.timestamp as original_timestamp,
+        invited_users_onboarding.user_id as invited_user_id,
+        invited_users_onboarding.anonymous_id as invited_user
+
+    FROM `td2-segment-warehouse.td2_node_js.invite_user_during_onboarding` invited_users_onboarding
+    WHERE invited_users_onboarding.timestamp >= '2022-01-12'
+
+    GROUP BY 1,2,3 order by 1 desc
+    ),
+
+#Get all trialers who accepted the credit card offer
+creditcard_offer_accepted_table as (
+SELECT  cc_offer.timestamp as original_timestamp,
+        cc_offer.user_id as accepted_offer_userid,
+        cc_offer.anonymous_id as user_accepted_Offer
+
+
+    FROM `td2-segment-warehouse.mystaff2.credit_card_offer_accepted` cc_offer
+    WHERE cc_offer.timestamp >= '2022-01-12'
+
+    GROUP BY 1,2,3 order by 1
+    ),
+
+#Get all trialers who added their credit card on the billing page
+added_credit_card_on_billing_table as (
+SELECT  added_cc_billing.timestamp as original_timestamp,
+        added_cc_billing.context_group_id as account_added_cc_billing,
+
+    FROM `td2-segment-warehouse.mystaff2.credit_card_added_on_billing` added_cc_billing
+    WHERE added_cc_billing.timestamp >= '2022-01-12'
+
+    GROUP BY 1,2 order by 1
+    ),
+
+#Get all trialers who completed onboarding 2
+completed_onboarding_2 as (
+SELECT  completed_onboard_2.timestamp as original_timestamp,
+        completed_onboard_2.context_group_id as account_completed_onboard_2,
+
+    FROM `td2-segment-warehouse.mystaff2.onboard_complete_2` completed_onboard_2
+    WHERE completed_onboard_2.timestamp >= '2022-01-12'
+
+    GROUP BY 1,2 order by 1
+    ),
+
+#Get trialers who have tracked time and calculate total time tracked
+tracked_time_table as (
+SELECT  time_tracked.timestamp as original_timestamp,
+        time_tracked.tdcompanyid as company_id,
+        sum(time_tracked.duration_seconds) as total_time_tracked
+
+    FROM `td2-segment-warehouse.td2_node_js.time_tracked` time_tracked
+    WHERE time_tracked.timestamp >= '2022-01-01'
+
+    GROUP BY 1,2
+),
+
+#Get all trialers who paid and became customers
+customer_table as (
+SELECT  groups2.firstpaymentdate as first_payment_date,
+        groups2.user_id as paid_user_id,
+        groups2.tdcompanyid as paid_company_id,
+FROM `td2-segment-warehouse.td2_node_js.groups` groups2
+
+WHERE groups2.firstpaymentdate >= '2022-01-12'
+
+GROUP BY 1, 2,3
+    )
+
+#Bring all data together
+SELECT  experiment_participants_table.experiment_id,
+        experiment_participants_table.experiment_variation_id,
+        experiment_participants_table.experiment_variation_name,
+        --account_created_table.home_cta,
+        count(distinct experiment_participants_table.experiment_visitor) as experiment_participants,
+        count(distinct account_created_table.user_id) as new_trials_all,
+        --count(distinct account_created_homepage_only_table.user_id) as new_trials_homepage_only,
+        --count(distinct account_created_other_pages_table.user_id) as new_trials_other_pages_only,
+        count(distinct invited_users_during_onboarding_table.invited_user_id) as invited_users_in_onboard,
+        count(distinct onboard_completed_table.onboard1_userid) as completed_onboard,
+        count(distinct creditcard_offer_accepted_table.accepted_offer_userid) as trialer_accepted_offer,
+        count(distinct added_credit_card_on_billing_table.account_added_cc_billing) as added_cc_on_billing,
+        count(distinct completed_onboarding_2.account_completed_onboard_2) as completed_onboarding_2,
+        count(distinct tracked_time_table.company_id) as Trialers_tracking_time,
+        sum(tracked_time_table.total_time_tracked) as total_time_tracked_seconds,
+        --count(distinct customer_table.paid_company_id) as became_customer,
+        --count(distinct homepage_visit_table.trialer_anonymousID) as homepPageVisit,
+        --count(distinct prescreen_visit_table.trialer_anonymousID) as PreSCreenVisit,
+        --count(distinct question1_visit_table.trialer_anonymousID) as Question1Visit,
+        --count(distinct question2_visit_table.trialer_anonymousID) as Question2Visit,
+        --count(distinct question3_visit_table.trialer_anonymousID) as Question3Visit,
+        --count(distinct question4_visit_table.trialer_anonymousID) as Question4Visit,
+
+FROM experiment_participants_table
+
+--left join account_created_homepage_only_table ON account_created_homepage_only_table.trialer_anonym_id = experiment_participants_table.experiment_visitor
+--left join account_created_other_pages_table ON account_created_other_pages_table.trialer_anonym_id = experiment_participants_table.experiment_visitor
+left join account_created_table ON account_created_table.trialer_anonym_id = experiment_participants_table.experiment_visitor
+left join invited_users_during_onboarding_table ON invited_users_during_onboarding_table.invited_user_id = account_created_table.user_id
+left join onboard_completed_table ON onboard_completed_table.onboard1_userid = account_created_table.user_id
+left join creditcard_offer_accepted_table ON creditcard_offer_accepted_table.accepted_offer_userid = account_created_table.user_id
+left join added_credit_card_on_billing_table ON added_credit_card_on_billing_table.account_added_cc_billing = account_created_table.company_id
+left join completed_onboarding_2 ON completed_onboarding_2.account_completed_onboard_2 = account_created_table.company_id
+left join tracked_time_table ON tracked_time_table.company_id = account_created_table.company_id
+left join customer_table ON customer_table.paid_company_id = account_created_table.company_id
+left join homepage_visit_table ON homepage_visit_table.trialer_anonymousID  = experiment_participants_table.experiment_visitor
+left join prescreen_visit_table ON prescreen_visit_table.trialer_anonymousID  = experiment_participants_table.experiment_visitor
+left join question1_visit_table ON question1_visit_table.trialer_anonymousID  = experiment_participants_table.experiment_visitor
+left join question2_visit_table ON question2_visit_table.trialer_anonymousID  = experiment_participants_table.experiment_visitor
+left join question3_visit_table ON question3_visit_table.trialer_anonymousID  = experiment_participants_table.experiment_visitor
+left join question4_visit_table ON question4_visit_table.trialer_anonymousID  = experiment_participants_table.experiment_visitor
+
+group by 1,2,3 order by 2 asc
